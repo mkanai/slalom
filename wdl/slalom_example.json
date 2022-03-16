@@ -1,0 +1,22 @@
+{
+    "slalom.zones": "us-central1-a us-central1-b us-central1-c us-central1-f",
+    "slalom.docker": "[DOCKER_IMAGE_PATH]",
+    "slalom.sumstats_pattern": "gs://PATH_TO_SUMSTAT",
+    "slalom.phenolistfile": "gs://gs://PATH_TO_LIST_OF_PHENOTYPES",
+    "slalom.grch38": true,
+    "slalom.preprocess.rsid_col": "rsid",
+    "slalom.preprocess.chromosome_col": "#CHR",
+    "slalom.preprocess.position_col": "POS",
+    "slalom.preprocess.allele1_col": "REF",
+    "slalom.preprocess.allele2_col": "ALT",
+    "slalom.preprocess.freq_col": "all_meta_AF",
+    "slalom.preprocess.beta_col": "inv_var_meta_beta",
+    "slalom.preprocess.se_col": "inv_var_meta_sebeta",
+    "slalom.preprocess.p_col": "inv_var_meta_p",
+    "slalom.preprocess.delimiter": "WHITESPACE",
+    "slalom.preprocess.window": 500000,
+    "slalom.preprocess.x_chromosome": true,
+    "slalom.preprocess.p_threshold": 5e-8,
+    "slalom.finemap.annotation_script": "[PATH_TO_SLALOM]",
+    "slalom.finemap.annotate.docker": "[HAIL_DOCKER_IMAGE_PATH]"
+}

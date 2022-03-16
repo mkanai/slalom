@@ -1,0 +1,2 @@
+lead_pip_variant	n_total	n_r2	n_dentist_s_outlier	fraction	n_nonsyn	max_pip	max_pip_nonsyn	cs_nonsyn	cs_99_nonsyn	nonsyn_variants	min_neff_r2	max_neff_r2
+chr1:161530340:A:G	1093	8	3	0.375	1	0.9493198562797898	6.1574597275512656e-09	False	False	chr1:161544752:A:C	19004.512752814775	76789.5591130493
