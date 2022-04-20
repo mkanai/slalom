@@ -50,6 +50,7 @@ def get_cs(variant, prob, coverage=0.95):
 
 
 def main(args):
+    hl._set_flags(no_whole_stage_codegen='1')
     reference_genome = args.reference_genome
     ht_snp = hl.import_table(args.snp, impute=True, types={"chromosome": hl.tstr}, delimiter="\s+")
     ht_snp = ht_snp.annotate(
@@ -195,7 +196,10 @@ def main(args):
 
     if args.summary:
         df["r2"] = df.r ** 2
-        df["n_eff_samples"] = df.n_samples * (df.n_cases / df.n_samples) * (1 - df.n_cases / df.n_samples)
+        if args.case_control:
+            df["n_eff_samples"] = df.n_samples * (df.n_cases / df.n_samples) * (1 - df.n_cases / df.n_samples)
+        else:
+            df["n_eff_samples"] = df.n_samples
         n_r2 = np.sum(df.r2 > args.r2_threshold)
         n_dentist_s_outlier = np.sum(
             (df.r2 > args.r2_threshold) & (df.nlog10p_dentist_s > args.nlog10p_dentist_s_threshold)
@@ -254,6 +258,7 @@ if __name__ == "__main__":
         help="Reference genome of sumstats",
     )
     parser.add_argument("--summary", action="store_true", help="Whether to output a summary file")
+    parser.add_argument("--case-control", action="store_true", help="Whether the input is from a case-control study")
     parser.add_argument(
         "--r2-threshold", type=float, default=0.6, help="r2 threshold of DENTIST-S outlier variants for prediction"
     )

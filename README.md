@@ -19,6 +19,14 @@ To run our WDL pipeline on Google Cloud, you additionally need:
 - [Cromwell](https://cromwell.readthedocs.io/en/stable/)
 - Active Google Cloud project
 
+To run SLALOM locally, you need:
+- [Cloud Storage Connector](https://hail.is/docs/0.2/cloud/google_cloud.html#reading-from-google-cloud-storage)
+
+The following command would be the easiest way of installation.
+```bash
+curl -sSL https://broad.io/install-gcs-connector | python3
+```
+
 ## Usage
 
 ### (Recommended) WDL pipeline
@@ -43,6 +51,7 @@ python3 slalom.py \
         --dentist-s \
         --abf \
         --summary \
+        --case-control \
         --reference-genome GRCh38
 ```
 
