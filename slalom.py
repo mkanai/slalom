@@ -26,6 +26,47 @@ class ParseKwargs(argparse.Action):
             getattr(namespace, self.dest)[key] = value
 
 
+# cf. https://github.com/armartin/prs_disparities/blob/master/run_prs_holdout.py
+def flip_text(base):
+    """
+    :param StringExpression base: Expression of a single base
+    :return: StringExpression of flipped base
+    :rtype: StringExpression
+    """
+    return hl.switch(base).when("A", "T").when("T", "A").when("C", "G").when("G", "C").default(base)
+
+
+def align_alleles(ht, ht_gnomad, flip_rows=None):
+    ht = ht.annotate(
+        **(
+            hl.case()
+            .when(
+                hl.is_defined(ht_gnomad[ht.locus, hl.array([ht.alleles[0], ht.alleles[1]])]),
+                hl.struct(alleles=[ht.alleles[0], ht.alleles[1]], flip_row=False),
+            )
+            .when(
+                hl.is_defined(ht_gnomad[ht.locus, hl.array([ht.alleles[1], ht.alleles[0]])]),
+                hl.struct(alleles=[ht.alleles[1], ht.alleles[0]], flip_row=True),
+            )
+            .when(
+                hl.is_defined(ht_gnomad[ht.locus, hl.array([flip_text(ht.alleles[0]), flip_text(ht.alleles[1])])]),
+                hl.struct(alleles=[flip_text(ht.alleles[0]), flip_text(ht.alleles[1])], flip_row=False),
+            )
+            .when(
+                hl.is_defined(ht_gnomad[ht.locus, hl.array([flip_text(ht.alleles[1]), flip_text(ht.alleles[0])])]),
+                hl.struct(alleles=[flip_text(ht.alleles[1]), flip_text(ht.alleles[0])], flip_row=True),
+            )
+            .default(hl.struct(alleles=[ht.alleles[0], ht.alleles[1]], flip_row=False))
+        )
+    )
+
+    if flip_rows is not None:
+        ht = ht.annotate(**{row: hl.if_else(ht.flip_row, -ht[row], ht[row]) for row in flip_rows})
+        ht = ht.drop("flip_row")
+
+    return ht
+
+
 def get_diag_mat(diag_vec: BlockMatrix):
     x = diag_vec.T.to_numpy()
     diag_mat = np.identity(len(x)) * np.outer(np.ones(len(x)), x)
@@ -50,13 +91,22 @@ def get_cs(variant, prob, coverage=0.95):
 
 
 def main(args):
-    hl._set_flags(no_whole_stage_codegen='1')
+    hl._set_flags(no_whole_stage_codegen="1")
     reference_genome = args.reference_genome
+    gnomad_ht_path = f"gs://meta-finemapping-simulation/gnomad/gnomad.genomes.r{gnomad_latest_versions[reference_genome]}.sites.most_severe.ht"
+
     ht_snp = hl.import_table(args.snp, impute=True, types={"chromosome": hl.tstr}, delimiter="\s+")
     ht_snp = ht_snp.annotate(
-        variant=hl.delimit([ht_snp.chromosome, hl.str(ht_snp.position), ht_snp.allele1, ht_snp.allele2], delimiter=":")
+        locus=hl.parse_locus(
+            hl.delimit([ht_snp.chromosome, hl.str(ht_snp.position)], delimiter=":"), reference_genome=reference_genome
+        ),
+        alleles=[ht_snp.allele1, ht_snp.allele2],
     )
-    ht_snp = ht_snp.annotate(**hl.parse_variant(ht_snp.variant, reference_genome=reference_genome))
+    if args.align_alleles:
+        ht_gnomad = hl.read_table(gnomad_ht_path)
+        ht_snp = align_alleles(ht_snp, ht_gnomad, flip_rows=["beta"])
+
+    ht_snp = ht_snp.annotate(variant=hl.variant_str(ht_snp.locus, ht_snp.alleles))
     ht_snp = ht_snp.key_by("locus", "alleles")
     ht_snp = ht_snp.add_index("idx_snp")
 
@@ -67,20 +117,18 @@ def main(args):
 
     # annotate vep and freq
     if args.annotate_consequence or args.annotate_gnomad_freq:
-        gnomad = hl.read_table(
-            f"gs://meta-finemapping-simulation/gnomad/gnomad.genomes.r{gnomad_latest_versions[reference_genome]}.sites.most_severe.ht"
-        )
+        ht_gnomad = hl.read_table(gnomad_ht_path)
         consequences = ["most_severe", "gene_most_severe", "consequence"] if args.annotate_consequence else []
         freq_expr = (
             {
-                f"gnomad_v{gnomad_latest_versions[reference_genome][0]}_af_{pop}": gnomad.freq[pop].AF
+                f"gnomad_v{gnomad_latest_versions[reference_genome][0]}_af_{pop}": ht_gnomad.freq[pop].AF
                 for pop in gnomad_pops[reference_genome]
             }
             if args.annotate_gnomad_freq
             else {}
         )
-        gnomad = gnomad.select(*consequences, **freq_expr)
-        ht_snp = ht_snp.join(gnomad, how="left")
+        ht_gnomad = ht_gnomad.select(*consequences, **freq_expr)
+        ht_snp = ht_snp.join(ht_gnomad, how="left")
     ht_snp = ht_snp.checkpoint(new_temp_file())
 
     df = ht_snp.key_by().drop("locus", "alleles", "idx_snp").to_pandas()
@@ -243,6 +291,7 @@ if __name__ == "__main__":
         choices=["p", "prob", "gamma", "gamma-p"],
         help="Strategy for choosing a lead variant",
     )
+    parser.add_argument("--align-alleles", action="store_true", help="Whether to align alleles with gnomAD")
     parser.add_argument("--annotate-consequence", action="store_true", help="Whether to annotate VEP consequences")
     parser.add_argument("--annotate-gnomad-freq", action="store_true", help="Whether to annotate gnomAD frequencies")
     parser.add_argument("--export-r", action="store_true", help="Export signed r values instead of r2")
