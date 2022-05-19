@@ -12,7 +12,7 @@ gnomad_latest_versions = {"GRCh37": "2.1.1", "GRCh38": "3.1.2"}
 gnomad_pops = {"GRCh37": ["afr", "amr", "eas", "fin", "nfe"], "GRCh38": ["afr", "amr", "eas", "fin", "nfe", "sas"]}
 gnomad_ld_variant_indices = {
     "GRCh37": "gs://gcp-public-data--gnomad/release/2.1.1/ld/gnomad.genomes.r2.1.1.{pop}.common.adj.ld.variant_indices.ht",
-    "GRCh38": "gs://xfinemap/gnomad/release/2.1.1/ld/gnomad.genomes.r2.1.1.{pop}.common.adj.ld.variant_indices.b38.ht",
+    "GRCh38": "gs://finucane-requester-pays/slalom/gnomad/release/2.1.1/ld/gnomad.genomes.r2.1.1.{pop}.common.adj.ld.variant_indices.b38.ht",
 }
 
 
@@ -93,7 +93,8 @@ def get_cs(variant, prob, coverage=0.95):
 def main(args):
     hl._set_flags(no_whole_stage_codegen="1")
     reference_genome = args.reference_genome
-    gnomad_ht_path = f"gs://meta-finemapping-simulation/gnomad/gnomad.genomes.r{gnomad_latest_versions[reference_genome]}.sites.most_severe.ht"
+    gnomad_version = gnomad_latest_versions[reference_genome]
+    gnomad_ht_path = f"gs://finucane-requester-pays/slalom/gnomad/release/{gnomad_version}/ht/genomes/gnomad.genomes.r{gnomad_version}.sites.most_severe.ht"
 
     ht_snp = hl.import_table(args.snp, impute=True, types={"chromosome": hl.tstr}, delimiter="\s+")
     ht_snp = ht_snp.annotate(
@@ -111,8 +112,10 @@ def main(args):
     ht_snp = ht_snp.add_index("idx_snp")
 
     # annotate in novel CUPs and reject
-    cup = hl.read_table(f"gs://meta-finemapping-simulation/cup_files/FASTA_BED.ALL_{reference_genome}.novel_CUPs.ht")
-    reject = hl.read_table(f"gs://meta-finemapping-simulation/cup_files/FASTA_BED.ALL_{reference_genome}.reject_2.ht")
+    cup = hl.read_table(f"gs://finucane-requester-pays/slalom/cup_files/FASTA_BED.ALL_{reference_genome}.novel_CUPs.ht")
+    reject = hl.read_table(
+        f"gs://finucane-requester-pays/slalom/cup_files/FASTA_BED.ALL_{reference_genome}.reject_2.ht"
+    )
     ht_snp = ht_snp.annotate(in_cups=hl.is_defined(cup[ht_snp.locus]) | hl.is_defined(reject[ht_snp.locus]))
 
     # annotate vep and freq
@@ -120,10 +123,7 @@ def main(args):
         ht_gnomad = hl.read_table(gnomad_ht_path)
         consequences = ["most_severe", "gene_most_severe", "consequence"] if args.annotate_consequence else []
         freq_expr = (
-            {
-                f"gnomad_v{gnomad_latest_versions[reference_genome][0]}_af_{pop}": ht_gnomad.freq[pop].AF
-                for pop in gnomad_pops[reference_genome]
-            }
+            {f"gnomad_v{gnomad_version[0]}_af_{pop}": ht_gnomad.freq[pop].AF for pop in gnomad_pops[reference_genome]}
             if args.annotate_gnomad_freq
             else {}
         )
