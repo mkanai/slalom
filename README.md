@@ -18,13 +18,16 @@ To run our WDL pipeline on Google Cloud, you additionally need:
 
 - [Cromwell](https://cromwell.readthedocs.io/en/stable/)
 - Active Google Cloud project
+  - Note: A part of reference files are located in a public requester-pays bucket (`gs://finucane-requester-pays`)
 
 To run SLALOM locally, you need:
+
 - [Cloud Storage Connector](https://hail.is/docs/0.2/cloud/google_cloud.html#reading-from-google-cloud-storage)
 
 The following command would be the easiest way of installation.
+
 ```bash
-curl -sSL https://broad.io/install-gcs-connector | python3
+curl -sSL https://broad.io/install-gcs-connector | python3 - --gcs-requester-pays-project YOUR_PROJECT_ID
 ```
 
 ## Usage
