@@ -166,22 +166,36 @@ def main(args):
     df["lead_variant"].iloc[lead_idx_snp] = True
 
     # annotate LD
-    for pop in gnomad_pops["GRCh37"]:
-        ht = hl.read_table(gnomad_ld_variant_indices[reference_genome].format(pop=pop))
+    r2_label = "r2" if not args.export_r else "r"
+    if args.ld_reference == "gnomad":
+        ld_matrices = [
+            f"gs://gcp-public-data--gnomad/release/2.1.1/ld/gnomad.genomes.r2.1.1.{pop}.common.ld.bm"
+            for pop in gnomad_pops["GRCh37"]
+        ]
+        ld_variant_indices = [
+            gnomad_ld_variant_indices[reference_genome].format(pop=pop) for pop in gnomad_pops["GRCh37"]
+        ]
+        ld_labels = [f"gnomad_lead_{r2_label}_{pop}" for pop in gnomad_pops["GRCh37"]]
+    else:
+        ld_matrices = [args.custom_ld_path]
+        ld_variant_indices = [args.custom_ld_variant_index_path]
+        ld_labels = [f"{args.custom_ld_label}_lead_{r2_label}"]
+
+    for ld_bm_path, ld_ht_path, col in zip(ld_matrices, ld_variant_indices, ld_labels):
+        ht = hl.read_table(ld_ht_path)
         ht = ht_snp.join(ht, "inner")
         ht = ht.checkpoint(new_temp_file())
 
         lead_idx = ht.filter(hl.variant_str(ht.locus, ht.alleles) == args.lead_variant).head(1).idx.collect()
 
         if len(lead_idx) == 0:
-            col = f"gnomad_lead_r2_{pop}" if not args.export_r else f"gnomad_lead_r_{pop}"
             df[col] = np.nan
             continue
 
         idx = ht.idx.collect()
         idx2 = sorted(list(set(idx)))
 
-        bm = BlockMatrix.read(f"gs://gcp-public-data--gnomad/release/2.1.1/ld/gnomad.genomes.r2.1.1.{pop}.common.ld.bm")
+        bm = BlockMatrix.read(ld_bm_path)
         bm = bm.filter(idx2, idx2)
         if not np.all(np.diff(idx) > 0):
             order = np.argsort(idx)
@@ -199,9 +213,6 @@ def main(args):
         r2 = bm.to_numpy()[0]
         if not args.export_r:
             r2 = r2 ** 2
-            col = f"gnomad_lead_r2_{pop}"
-        else:
-            col = f"gnomad_lead_r_{pop}"
 
         df[col] = np.nan
         df[col].iloc[idx_snp] = r2
@@ -224,6 +235,8 @@ def main(args):
             n_samples = np.array(n_samples).T
             ld = np.array(ld).T
             df["r"] = np.nansum(n_samples * ld, axis=1) / np.nansum(n_samples * ~np.isnan(ld), axis=1)
+    elif args.ld_reference == "custom":
+        df["r"] = df[ld_labels[0]]
     else:
         df["r"] = df["gnomad_lead_r_nfe"]
 
@@ -294,6 +307,12 @@ if __name__ == "__main__":
     parser.add_argument("--align-alleles", action="store_true", help="Whether to align alleles with gnomAD")
     parser.add_argument("--annotate-consequence", action="store_true", help="Whether to annotate VEP consequences")
     parser.add_argument("--annotate-gnomad-freq", action="store_true", help="Whether to annotate gnomAD frequencies")
+    parser.add_argument(
+        "--ld-reference", type=str, default="gnomad", choices=["gnomad", "custom"], help="Choice of LD reference"
+    )
+    parser.add_argument("--custom-ld-path", type=str, help="Path of user-provided LD BlockMatrix")
+    parser.add_argument("--custom-ld-variant-index-path", type=str, help="Path of user-provided LD variant index table")
+    parser.add_argument("--custom-ld-label", type=str, help="Label of user-provided LD")
     parser.add_argument("--export-r", action="store_true", help="Export signed r values instead of r2")
     parser.add_argument("--weighted-average-r", type=str, nargs="+", action=ParseKwargs, help="")
     parser.add_argument("--dentist-s", action="store_true", help="Annotate DENTIST-S statistics")
@@ -322,5 +341,12 @@ if __name__ == "__main__":
 
     if args.out_summary is None:
         args.out_summary = f"{os.path.splitext(args.out)[0]}.summary.txt"
+
+    if args.ld_reference == "custom" and (
+        (args.custom_ld_path is None) or (args.custom_ld_variant_index_path is None) or (args.custom_ld_label is None)
+    ):
+        raise argparse.ArgumentError(
+            "All of --custom-ld-path, --custom-ld-variant-index-path, and --custom-ld-label should be provided"
+        )
 
     main(args)
