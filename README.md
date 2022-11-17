@@ -60,7 +60,7 @@ python3 slalom.py \
 
 ## Citation
 
-Kanai, M. et al. [Meta-analysis fine-mapping is often miscalibrated at single-variant resolution](http://dx.doi.org/10.1101/2022.03.16.22272457). medRxiv (2022) doi:10.1101/2022.03.16.22272457
+Kanai, M. et al. [Meta-analysis fine-mapping is often miscalibrated at single-variant resolution](http://dx.doi.org/10.1016/j.xgen.2022.100210). Cell Genomics 2, 100210 (2022)
 
 ## Contact
 
