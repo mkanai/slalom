@@ -47,6 +47,7 @@ python3 slalom.py \
         --out example/example.slalom.txt \
         --out-summary example/example.summary.txt \
         --annotate-consequence \
+        --annotate-cups \
         --annotate-gnomad-freq \
         --export-r \
         --lead-variant-choice "prob" \

@@ -75,9 +75,9 @@ def get_diag_mat(diag_vec: BlockMatrix):
 
 def abf(beta, se, W=0.04):
     z = beta / se
-    V = se ** 2
+    V = se**2
     r = W / (W + V)
-    lbf = 0.5 * (np.log(1 - r) + (r * z ** 2))
+    lbf = 0.5 * (np.log(1 - r) + (r * z**2))
     denom = sp.special.logsumexp(lbf)
     prob = np.exp(lbf - denom)
     return lbf, prob
@@ -106,17 +106,21 @@ def main(args):
     if args.align_alleles:
         ht_gnomad = hl.read_table(gnomad_ht_path)
         ht_snp = align_alleles(ht_snp, ht_gnomad, flip_rows=["beta"])
+        ht_snp = ht_snp.annotate(variant_aligned=hl.variant_str(ht_snp.locus, ht_snp.alleles))
 
     ht_snp = ht_snp.annotate(variant=hl.variant_str(ht_snp.locus, ht_snp.alleles))
     ht_snp = ht_snp.key_by("locus", "alleles")
     ht_snp = ht_snp.add_index("idx_snp")
 
     # annotate in novel CUPs and reject
-    cup = hl.read_table(f"gs://finucane-requester-pays/slalom/cup_files/FASTA_BED.ALL_{reference_genome}.novel_CUPs.ht")
-    reject = hl.read_table(
-        f"gs://finucane-requester-pays/slalom/cup_files/FASTA_BED.ALL_{reference_genome}.reject_2.ht"
-    )
-    ht_snp = ht_snp.annotate(in_cups=hl.is_defined(cup[ht_snp.locus]) | hl.is_defined(reject[ht_snp.locus]))
+    if args.annotate_cups:
+        cup = hl.read_table(
+            f"gs://finucane-requester-pays/slalom/cup_files/FASTA_BED.ALL_{reference_genome}.novel_CUPs.ht"
+        )
+        reject = hl.read_table(
+            f"gs://finucane-requester-pays/slalom/cup_files/FASTA_BED.ALL_{reference_genome}.reject_2.ht"
+        )
+        ht_snp = ht_snp.annotate(in_cups=hl.is_defined(cup[ht_snp.locus]) | hl.is_defined(reject[ht_snp.locus]))
 
     # annotate vep and freq
     if args.annotate_consequence or args.annotate_gnomad_freq:
@@ -131,7 +135,9 @@ def main(args):
         ht_snp = ht_snp.join(ht_gnomad, how="left")
     ht_snp = ht_snp.checkpoint(new_temp_file())
 
-    df = ht_snp.key_by().drop("locus", "alleles", "idx_snp").to_pandas()
+    t = new_temp_file()
+    df = ht_snp.key_by().drop("locus", "alleles", "idx_snp").export(t)
+    df = pd.read_csv(t, sep="\t", dtype={"chromosome": "string"})
 
     if args.abf:
         lbf, prob = abf(df.beta, df.se, W=args.abf_prior_variance)
@@ -163,7 +169,7 @@ def main(args):
         lead_idx_snp = df.index[df.variant == args.lead_variant]
 
     df["lead_variant"] = False
-    df["lead_variant"].iloc[lead_idx_snp] = True
+    df.iloc[lead_idx_snp, df.columns.get_loc("lead_variant")] = True
 
     # annotate LD
     r2_label = "r2" if not args.export_r else "r"
@@ -193,29 +199,34 @@ def main(args):
             continue
 
         idx = ht.idx.collect()
+        # sorted index - BlockMatrix.filter requires sorted index
         idx2 = sorted(list(set(idx)))
+        # relative lead pos in sorted index
+        idx3 = np.where(np.array(idx2) == lead_idx[0])[0].tolist()
+        # relative lead pos in original index
+        idx4 = np.where(np.array(idx) == lead_idx[0])[0].tolist()
 
         bm = BlockMatrix.read(ld_bm_path)
         bm = bm.filter(idx2, idx2)
+        v_row = bm.filter_rows(idx3).to_numpy()[0]
+        v_col = bm.filter_cols(idx3).T.to_numpy()[0]
         if not np.all(np.diff(idx) > 0):
             order = np.argsort(idx)
             rank = np.empty_like(order)
             _, inv_idx = np.unique(np.sort(idx), return_inverse=True)
             rank[order] = inv_idx
-            mat = bm.to_numpy()[np.ix_(rank, rank)]
-            bm = BlockMatrix.from_numpy(mat)
+            v_row = v_row[rank]
+            v_col = v_col[rank]
 
-        # re-densify triangluar matrix
-        bm = bm + bm.T - get_diag_mat(bm.diagonal())
-        bm = bm.filter_rows(np.where(np.array(idx) == lead_idx[0])[0].tolist())
+        # re-densify
+        r2 = v_row + v_col
+        r2[idx4] = r2[idx4] / 2
+        if not args.export_r:
+            r2 = r2**2
 
         idx_snp = ht.idx_snp.collect()
-        r2 = bm.to_numpy()[0]
-        if not args.export_r:
-            r2 = r2 ** 2
-
         df[col] = np.nan
-        df[col].iloc[idx_snp] = r2
+        df.iloc[idx_snp, df.columns.get_loc(col)] = r2
 
     if args.weighted_average_r is not None:
         n_samples = []
@@ -242,9 +253,9 @@ def main(args):
 
     if args.dentist_s:
         lead_z = (df.beta / df.se).iloc[lead_idx_snp]
-        df["t_dentist_s"] = ((df.beta / df.se) - df.r * lead_z) ** 2 / (1 - df.r ** 2)
+        df["t_dentist_s"] = ((df.beta / df.se) - df.r * lead_z) ** 2 / (1 - df.r**2)
         df["t_dentist_s"] = np.where(df["t_dentist_s"] < 0, np.inf, df["t_dentist_s"])
-        df["t_dentist_s"].iloc[lead_idx_snp] = np.nan
+        df.iloc[lead_idx_snp, df.columns.get_loc("t_dentist_s")] = np.nan
         df["nlog10p_dentist_s"] = sp.stats.chi2.logsf(df["t_dentist_s"], df=1) / -np.log(10)
 
     if args.out.startswith("gs://"):
@@ -256,36 +267,52 @@ def main(args):
         df.drop(columns=["variant"]).to_csv(f, sep="\t", na_rep="NA", index=False)
 
     if args.summary:
-        df["r2"] = df.r ** 2
-        if args.case_control:
-            df["n_eff_samples"] = df.n_samples * (df.n_cases / df.n_samples) * (1 - df.n_cases / df.n_samples)
-        else:
-            df["n_eff_samples"] = df.n_samples
+        df["r2"] = df.r**2
         n_r2 = np.sum(df.r2 > args.r2_threshold)
-        n_dentist_s_outlier = np.sum(
-            (df.r2 > args.r2_threshold) & (df.nlog10p_dentist_s > args.nlog10p_dentist_s_threshold)
-        )
+        n_na = np.sum(np.isnan(df.r2))
+        outlier_idx = (df.r2 > args.r2_threshold) & (df.nlog10p_dentist_s > args.nlog10p_dentist_s_threshold)
+        n_dentist_s_outlier = np.sum(outlier_idx)
         max_pip_idx = df.prob.idxmax()
-        nonsyn_idx = (df.r2 > args.r2_threshold) & df.consequence.isin(["pLoF", "Missense"])
         variant = df.chromosome.str.cat([df.position.astype(str), df.allele1, df.allele2], sep=":")
-        n_eff_r2 = df.n_eff_samples.loc[df.r2 > args.r2_threshold]
-        df_summary = pd.DataFrame(
-            {
-                "lead_pip_variant": [variant.iloc[max_pip_idx]],
-                "n_total": [len(df.index)],
-                "n_r2": [n_r2],
-                "n_dentist_s_outlier": [n_dentist_s_outlier],
-                "fraction": [n_dentist_s_outlier / n_r2 if n_r2 > 0 else 0],
+        expr = {
+            "lead_pip_variant": [variant.iloc[max_pip_idx]],
+            "n_total": [len(df.index)],
+            "n_r2": [n_r2],
+            "n_na": [n_na],
+            "n_dentist_s_outlier": [n_dentist_s_outlier],
+            "fraction": [n_dentist_s_outlier / n_r2 if n_r2 > 0 else 0],
+            "max_pip": [np.max(df.prob)],
+        }
+
+        if args.annotate_consequence:
+            nonsyn_idx = (df.r2 > args.r2_threshold) & df.consequence.isin(["pLoF", "Missense"])
+            expr = {
+                **expr,
                 "n_nonsyn": [np.sum(nonsyn_idx)],
-                "max_pip": [np.max(df.prob)],
+                "n_nonsyn_outlier": [np.sum(nonsyn_idx & outlier_idx)],
                 "max_pip_nonsyn": [np.max(df.prob.loc[nonsyn_idx])],
                 "cs_nonsyn": [np.any(df.cs.loc[nonsyn_idx])],
                 "cs_99_nonsyn": [np.any(df.cs_99.loc[nonsyn_idx])],
                 "nonsyn_variants": [",".join(variant.loc[nonsyn_idx].values)],
+            }
+
+        if "n_samples" in df.columns:
+            if args.case_control:
+                if "n_cases" in df.columns:
+                    df["n_eff_samples"] = df.n_samples * (df.n_cases / df.n_samples) * (1 - df.n_cases / df.n_samples)
+                else:
+                    df["n_eff_samples"] = np.nan
+            else:
+                df["n_eff_samples"] = df.n_samples
+
+            n_eff_r2 = df.n_eff_samples.loc[df.r2 > args.r2_threshold]
+            expr = {
+                **expr,
                 "min_neff_r2": [np.nanmin(n_eff_r2) if n_r2 > 0 else np.nan],
                 "max_neff_r2": [np.nanmax(n_eff_r2)] if n_r2 > 0 else np.nan,
             }
-        )
+
+        df_summary = pd.DataFrame(expr)
         with fopen(args.out_summary, "w") as f:
             df_summary.to_csv(f, sep="\t", na_rep="NA", index=False)
 
@@ -305,6 +332,9 @@ if __name__ == "__main__":
         help="Strategy for choosing a lead variant",
     )
     parser.add_argument("--align-alleles", action="store_true", help="Whether to align alleles with gnomAD")
+    parser.add_argument(
+        "--annotate-cups", action="store_true", help="Whether to annotate novel conversion-unstable positions (CUPs)"
+    )
     parser.add_argument("--annotate-consequence", action="store_true", help="Whether to annotate VEP consequences")
     parser.add_argument("--annotate-gnomad-freq", action="store_true", help="Whether to annotate gnomAD frequencies")
     parser.add_argument(
