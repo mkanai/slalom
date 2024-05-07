@@ -1,8 +1,8 @@
 {
     "slalom.zones": "us-central1-a us-central1-b us-central1-c us-central1-f",
     "slalom.docker": "[DOCKER_IMAGE_PATH]",
-    "slalom.sumstats_pattern": "gs://PATH_TO_SUMSTAT",
-    "slalom.phenolistfile": "gs://gs://PATH_TO_LIST_OF_PHENOTYPES",
+    "slalom.sumstats_pattern": "gs://YOUR_BUCKET/PATH_TO_SUMSTAT/{PHENO}.sumstats.txt.gz",
+    "slalom.phenolistfile": "gs://YOUR_BUCKET/PATH_TO_LIST_OF_PHENOTYPES",
     "slalom.grch38": true,
     "slalom.align_alleles": true,
     "slalom.preprocess.rsid_col": "rsid",
