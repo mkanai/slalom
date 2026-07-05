@@ -138,21 +138,6 @@ def _parse_storage_options(raw: Optional[str]) -> Optional[dict]:
     return opts
 
 
-def _validate(args: argparse.Namespace) -> None:
-    if args.ld_reference == "custom" and (
-        not args.custom_ld_path or not args.custom_ld_variant_index_path or not args.custom_ld_label
-    ):
-        raise ValueError(
-            "--ld-reference custom requires --custom-ld-path, " "--custom-ld-variant-index-path, and --custom-ld-label"
-        )
-    if args.weighted_average_r is not None and not args.export_r:
-        raise ValueError("--weighted-average-r requires --export-r (it averages signed r).")
-    if args.summary and not args.dentist_s:
-        raise ValueError("--summary requires --dentist-s (it reports DENTIST-S outliers).")
-    if args.summary and not args.abf:
-        raise ValueError("--summary requires --abf (it reports max PIP / credible sets).")
-
-
 def _config_from_args(args: argparse.Namespace) -> SlalomConfig:
     ld_variant_index_paths = None
     if args.ld_variant_index_dir:
@@ -198,7 +183,7 @@ def main(argv: Optional[Sequence[str]] = None) -> None:
         logging.getLogger("slalom").setLevel(logging.DEBUG)
 
     try:
-        _validate(args)
+        # SlalomConfig.__post_init__ enforces the run invariants (raises ValueError).
         cfg = _config_from_args(args)
     except ValueError as exc:
         parser.error(str(exc))

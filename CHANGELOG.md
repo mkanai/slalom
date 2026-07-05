@@ -20,6 +20,10 @@ console entry point.
   type-checkers pick up the annotations, plus a lenient `mypy` config and a CI `typecheck` job.
 
 ### Changed
+- Run invariants (custom-LD paths; `weighted_average_r` requires `export_r`; `summary`
+  requires `dentist_s` and `abf`) are now validated in `SlalomConfig` construction, so the
+  programmatic `run_slalom(SlalomConfig(...))` API rejects invalid configs the same way the
+  CLI does. Previously these were only checked in the CLI layer.
 - **LD is read from the gnomAD Hail `BlockMatrix` in pure Python via
   [`ldcov`](https://github.com/mkanai/ldcov)** — no Hail or Spark at runtime. Only the
   blocks along the lead variant's row/column are read.

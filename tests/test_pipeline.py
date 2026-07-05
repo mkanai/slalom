@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from slalom.pipeline import SlalomConfig, run_slalom
 from tests.helpers import make_symmetric_bm, write_variant_index
@@ -136,6 +137,31 @@ def test_custom_ld_without_export_r_emits_r2(tmp_path):
     # df["r"] stays signed (combined), so DENTIST-S sees signed r, not r^2.
     assert np.allclose(df["r"].to_numpy(), full[1])
     assert np.allclose(out["test_lead_r2"].to_numpy(), full[1] ** 2)
+
+
+def test_config_validates_gnomad_defaults():
+    # A minimal gnomAD-reference config is valid and defaults out_summary from out.
+    cfg = SlalomConfig(snp="in.snp", out="out.txt")
+    assert cfg.out_summary == "out.summary.txt"
+
+
+def test_config_custom_requires_paths():
+    # ld_reference="custom" without the three custom_ld_* fields is rejected at construction,
+    # so the library API is as safe as the CLI (not only cli.main).
+    with pytest.raises(ValueError, match="custom_ld_path"):
+        SlalomConfig(snp="in.snp", out="out.txt", ld_reference="custom")
+
+
+def test_config_weighted_average_requires_export_r():
+    with pytest.raises(ValueError, match="export_r"):
+        SlalomConfig(snp="in.snp", out="out.txt", weighted_average_r={"nfe": "n_nfe"})
+
+
+def test_config_summary_requires_dentist_s_and_abf():
+    with pytest.raises(ValueError, match="dentist_s"):
+        SlalomConfig(snp="in.snp", out="out.txt", summary=True, abf=True)
+    with pytest.raises(ValueError, match="abf"):
+        SlalomConfig(snp="in.snp", out="out.txt", summary=True, dentist_s=True)
 
 
 def test_gnomad_default_export_r_false_combines_r(tmp_path, monkeypatch):

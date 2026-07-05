@@ -74,6 +74,27 @@ class SlalomConfig:
     def __post_init__(self) -> None:
         if self.out_summary is None:
             self.out_summary = f"{os.path.splitext(self.out)[0]}.summary.txt"
+        self._validate()
+
+    def _validate(self) -> None:
+        """Enforce the run invariants shared by the CLI and the library API.
+
+        Centralising these here (rather than in the CLI) means any ``SlalomConfig`` that
+        constructs successfully is a valid run, so downstream code (e.g. ``_ld_targets``)
+        can treat the custom-LD paths as present.
+        """
+        if self.ld_reference == "custom" and not (
+            self.custom_ld_path and self.custom_ld_variant_index_path and self.custom_ld_label
+        ):
+            raise ValueError(
+                "ld_reference='custom' requires custom_ld_path, custom_ld_variant_index_path, and custom_ld_label."
+            )
+        if self.weighted_average_r is not None and not self.export_r:
+            raise ValueError("weighted_average_r requires export_r=True (it averages signed r).")
+        if self.summary and not self.dentist_s:
+            raise ValueError("summary requires dentist_s=True (it reports DENTIST-S outliers).")
+        if self.summary and not self.abf:
+            raise ValueError("summary requires abf=True (it reports max PIP / credible sets).")
 
 
 def _make_variant_ids(df: "pd.DataFrame") -> "pd.Series":
@@ -125,7 +146,8 @@ def _ld_targets(cfg: SlalomConfig) -> Tuple[List[str], List[str], List[str], Lis
         r_labels = [f"gnomad_lead_r_{pop}" for pop in resources.LD_POPS]
         r2_labels = [f"gnomad_lead_r2_{pop}" for pop in resources.LD_POPS]
         return bm_paths, index_paths, r_labels, r2_labels
-    # custom single-panel reference (paths are validated non-None for --ld-reference custom)
+    # custom single-panel reference. SlalomConfig._validate guarantees these paths are set
+    # whenever ld_reference == "custom", so the cast to List[str] is a real invariant.
     r_labels = [f"{cfg.custom_ld_label}_lead_r"]
     r2_labels = [f"{cfg.custom_ld_label}_lead_r2"]
     bm_paths = cast(List[str], [cfg.custom_ld_path])
