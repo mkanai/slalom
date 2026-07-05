@@ -11,7 +11,10 @@ default a variant must match the panel's exact ref/alt orientation; ``allow_alle
 also matches the ref/alt swap and sign-flips r accordingly.
 """
 
+from __future__ import annotations
+
 from collections import defaultdict
+from typing import List, Optional
 
 import numpy as np
 import pandas as pd
@@ -19,7 +22,7 @@ from ldcov.io.blockmatrix import HailBlockMatrixReader
 from ldcov.io.variant_index import VariantIndex
 
 
-def _extract_lead_row(reader, lead_idx, target_idxs):
+def _extract_lead_row(reader: HailBlockMatrixReader, lead_idx: int, target_idxs: List[int]) -> np.ndarray:
     """Return the upper-triangular value r(lead, j) for each j in `target_idxs`.
 
     Reads only the blocks touched by the lead variant's row/column; off-band pairs that
@@ -44,14 +47,14 @@ def _extract_lead_row(reader, lead_idx, target_idxs):
 
 
 def lead_variant_r(
-    df,
-    lead_row,
-    bm_path,
-    variant_index_path,
-    storage_options=None,
-    block_cache=8,
-    allow_allele_swap=False,
-):
+    df: pd.DataFrame,
+    lead_row: int,
+    bm_path: str,
+    variant_index_path: str,
+    storage_options: Optional[dict] = None,
+    block_cache: int = 8,
+    allow_allele_swap: bool = False,
+) -> np.ndarray:
     """LD (r) between the lead variant and every row of `df` from one LD panel.
 
     Parameters

@@ -4,11 +4,18 @@ Wakefield's ABF gives a per-variant posterior inclusion probability (PIP) and a
 credible set from marginal effect sizes and standard errors alone.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Tuple
+
 import numpy as np
 import scipy.special
 
+if TYPE_CHECKING:
+    import numpy.typing as npt
 
-def abf(beta, se, W=0.04):
+
+def abf(beta: "npt.ArrayLike", se: "npt.ArrayLike", W: float = 0.04) -> Tuple[np.ndarray, np.ndarray]:
     """Wakefield approximate Bayes factors and posterior inclusion probabilities.
 
     Parameters
@@ -36,7 +43,7 @@ def abf(beta, se, W=0.04):
     return lbf, prob
 
 
-def get_cs(variant, prob, coverage=0.95):
+def get_cs(variant: "npt.ArrayLike", prob: "npt.ArrayLike", coverage: float = 0.95) -> np.ndarray:
     """Return the credible set of variants covering `coverage` of the posterior mass.
 
     Returns an empty array if the posterior never reaches `coverage` (e.g. all-NaN PIPs

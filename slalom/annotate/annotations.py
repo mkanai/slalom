@@ -4,15 +4,22 @@ gnomAD sites annotations (consequence + frequency) and CUP flags come from regio
 Parquet queries plus pandas merges. Join keys use the *aligned* alleles (`ref`/`alt`).
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, List
+
 import numpy as np
 import pandas as pd
 
 from ..resources import GNOMAD_POPS, gnomad_version
 
+if TYPE_CHECKING:
+    from ..io.reference import ReferencePanel
+
 _CONSEQUENCE_COLUMNS = ["most_severe", "gene_most_severe", "consequence"]
 
 
-def _gather_sites(panel, df, columns):
+def _gather_sites(panel: "ReferencePanel", df: pd.DataFrame, columns: List[str]) -> pd.DataFrame:
     """Concatenate per-contig gnomAD sites region queries covering all variants in `df`."""
     frames = []
     for chrom, sub in df.groupby("chromosome"):
@@ -23,7 +30,13 @@ def _gather_sites(panel, df, columns):
     return pd.concat(frames, ignore_index=True)
 
 
-def annotate_consequence_and_freq(df, panel, reference_genome, annotate_consequence=False, annotate_freq=False):
+def annotate_consequence_and_freq(
+    df: pd.DataFrame,
+    panel: "ReferencePanel",
+    reference_genome: str,
+    annotate_consequence: bool = False,
+    annotate_freq: bool = False,
+) -> pd.DataFrame:
     """Left-join gnomAD most-severe consequence and/or per-population AF onto `df`.
 
     Frequency columns are named ``gnomad_v{major}_af_{pop}`` (e.g. ``gnomad_v3_af_nfe`` for
@@ -50,7 +63,7 @@ def annotate_consequence_and_freq(df, panel, reference_genome, annotate_conseque
     return df
 
 
-def annotate_cups(df, panel):
+def annotate_cups(df: pd.DataFrame, panel: "ReferencePanel") -> pd.DataFrame:
     """Flag variants that fall in a novel CUP or reject interval.
 
     Adds a boolean `in_cups` column. CUPs are half-open intervals [start, end); a variant

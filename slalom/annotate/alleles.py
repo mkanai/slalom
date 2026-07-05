@@ -10,12 +10,21 @@ annotation join); the input `allele1`/`allele2` columns are left untouched so ou
 IDs match the input.
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Optional
+
 import numpy as np
+
+if TYPE_CHECKING:
+    import pandas as pd
+
+    from ..io.reference import ReferencePanel
 
 _COMPLEMENT = {"A": "T", "T": "A", "C": "G", "G": "C"}
 
 
-def _flip_strand(allele):
+def _flip_strand(allele: str) -> str:
     """Strand-complement a single-nucleotide allele; leave anything else unchanged.
 
     Only the four bases are complemented; indels and multi-base alleles pass through as-is.
@@ -23,7 +32,9 @@ def _flip_strand(allele):
     return _COMPLEMENT.get(allele, allele)
 
 
-def align_alleles(df, panel, reference_genome=None):
+def align_alleles(
+    df: "pd.DataFrame", panel: "ReferencePanel", reference_genome: Optional[str] = None
+) -> "pd.DataFrame":
     """Return `df` with aligned `ref`/`alt` columns and strand/swap-corrected `beta`.
 
     Parameters

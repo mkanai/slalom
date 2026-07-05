@@ -8,8 +8,11 @@ This package reads Hail ``BlockMatrix`` LD stores in pure Python via ``ldcov`` a
 needs no Hail/Spark at runtime. See :func:`slalom.pipeline.run_slalom`.
 """
 
+from __future__ import annotations
+
 from importlib.metadata import PackageNotFoundError as _PackageNotFoundError
 from importlib.metadata import version as _version
+from typing import Any
 
 try:
     __version__ = _version("slalom")
@@ -29,7 +32,7 @@ _LAZY_IMPORTS = {
 }
 
 
-def __getattr__(name):
+def __getattr__(name: str) -> Any:
     if name in _LAZY_IMPORTS:
         import importlib
 

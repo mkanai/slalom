@@ -48,6 +48,7 @@ dev = [
     "pytest-cov>=2.10.0",
     "black>=25.11.0",  # last black supporting py3.9; tree is formatted for both 25.x and newer
     "ruff>=0.6.0",
+    "mypy>=1.0.0",
 ]
 
 [project.urls]
@@ -61,6 +62,10 @@ slalom = "slalom.cli.main:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["slalom*"]
+
+# Ship the PEP 561 marker so downstream type-checkers pick up slalom's inline hints.
+[tool.setuptools.package-data]
+slalom = ["py.typed"]
 
 [tool.black]
 line-length = 120
@@ -77,6 +82,16 @@ target-version = "py39"
 [tool.ruff.lint]
 # pycodestyle errors, pyflakes, warnings, import sorting. Formatting stays with black.
 select = ["E", "F", "W", "I"]
+
+[tool.mypy]
+# No python_version pin: recent mypy no longer targets 3.9 (the CI mypy job runs on 3.12).
+# The ruff py39 target and the pytest matrix guard 3.9 compatibility instead.
+files = ["slalom"]
+# Lenient to start: numpy/pandas/pyarrow/ldcov ship partial or no stubs, so we only
+# check slalom's own annotations rather than chasing third-party typing gaps.
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

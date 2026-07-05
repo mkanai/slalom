@@ -5,24 +5,31 @@ only the relevant slice via pyarrow predicate pushdown, so no Hail/Spark is need
 runtime. Build the Parquet copies once with the helpers under ``scripts/`` (see README).
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, List, Optional
+
 import pyarrow.compute as pc
 import pyarrow.dataset as ds
 from ldcov.io.fs_utils import resolve_filesystem
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 
 class _ParquetTable:
     """Thin wrapper over a Parquet dataset with a contig/position region query."""
 
-    def __init__(self, path, storage_options=None):
+    def __init__(self, path: str, storage_options: Optional[dict] = None) -> None:
         self.path = path
         fs, inner = resolve_filesystem(path, storage_options)
         self._dataset = ds.dataset(inner, format="parquet", filesystem=fs)
 
     @property
-    def columns(self):
+    def columns(self) -> List[str]:
         return self._dataset.schema.names
 
-    def query_region(self, chrom, start, end, columns=None):
+    def query_region(self, chrom: str, start: int, end: int, columns: Optional[List[str]] = None) -> "pd.DataFrame":
         flt = (
             (pc.field("contig") == str(chrom))
             & (pc.field("position") >= int(start))
@@ -39,15 +46,20 @@ class ReferencePanel:
     that skips (say) CUP annotation never touches the CUP Parquet.
     """
 
-    def __init__(self, sites_path=None, cup_path=None, storage_options=None):
+    def __init__(
+        self,
+        sites_path: Optional[str] = None,
+        cup_path: Optional[str] = None,
+        storage_options: Optional[dict] = None,
+    ) -> None:
         self._sites_path = sites_path
         self._cup_path = cup_path
         self._storage_options = storage_options
-        self._sites = None
-        self._cups = None
+        self._sites: Optional[_ParquetTable] = None
+        self._cups: Optional[_ParquetTable] = None
 
     @property
-    def sites(self):
+    def sites(self) -> _ParquetTable:
         if self._sites is None:
             if self._sites_path is None:
                 raise ValueError("gnomAD sites Parquet path is not configured")
@@ -55,18 +67,18 @@ class ReferencePanel:
         return self._sites
 
     @property
-    def cups(self):
+    def cups(self) -> _ParquetTable:
         if self._cups is None:
             if self._cup_path is None:
                 raise ValueError("CUP Parquet path is not configured")
             self._cups = _ParquetTable(self._cup_path, self._storage_options)
         return self._cups
 
-    def query_sites(self, chrom, start, end, columns=None):
+    def query_sites(self, chrom: str, start: int, end: int, columns: Optional[List[str]] = None) -> "pd.DataFrame":
         """gnomAD sites annotation rows on `chrom` with start <= position <= end."""
         return self.sites.query_region(chrom, start, end, columns=columns)
 
-    def query_cups(self, chrom, start, end):
+    def query_cups(self, chrom: str, start: int, end: int) -> "pd.DataFrame":
         """CUP intervals on `chrom` that overlap the half-open window [start, end].
 
         The CUP table stores half-open intervals [start, end); an interval overlaps the

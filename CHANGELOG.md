@@ -16,6 +16,8 @@ console entry point.
   and `scripts/make_bundles.sh` to package them into downloadable tar.gz bundles.
 - `--ld-variant-index-dir` to read gnomAD LD variant indices from a local directory (e.g. an
   extracted ldcov bundle), enabling runs with no requester-pays access.
+- Inline type hints across the package and a PEP 561 `py.typed` marker so downstream
+  type-checkers pick up the annotations, plus a lenient `mypy` config and a CI `typecheck` job.
 
 ### Changed
 - **LD is read from the gnomAD Hail `BlockMatrix` in pure Python via

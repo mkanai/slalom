@@ -4,10 +4,12 @@ LD is read from a Hail ``BlockMatrix`` through ldcov; annotations come from Parq
 reference tables. No Hail/Spark is required at runtime.
 """
 
+from __future__ import annotations
+
 import logging
 import os
 from dataclasses import dataclass
-from typing import Dict, Optional, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union, cast
 
 import numpy as np
 
@@ -19,6 +21,9 @@ from .io.snp import read_snp, write_table
 from .ld import lead_variant_r
 from .stats.abf import abf, get_cs
 from .stats.dentist import dentist_s
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -66,12 +71,12 @@ class SlalomConfig:
     storage_options: Optional[dict] = None
     block_cache: int = 8
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.out_summary is None:
             self.out_summary = f"{os.path.splitext(self.out)[0]}.summary.txt"
 
 
-def _make_variant_ids(df):
+def _make_variant_ids(df: "pd.DataFrame") -> "pd.Series":
     """chrom:pos:ref:alt using the aligned alleles (matches hl.variant_str)."""
     return (
         df["chromosome"].astype(str)
@@ -84,7 +89,7 @@ def _make_variant_ids(df):
     )
 
 
-def _choose_lead_index(df, cfg):
+def _choose_lead_index(df: "pd.DataFrame", cfg: SlalomConfig) -> int:
     """Return the integer row index of the lead variant per the configured strategy."""
     if cfg.lead_variant is not None:
         matches = np.where(df["variant"].to_numpy() == cfg.lead_variant)[0]
@@ -108,7 +113,7 @@ def _choose_lead_index(df, cfg):
     raise ValueError(f"Unknown lead-variant choice: {cfg.lead_variant_choice}")
 
 
-def _ld_targets(cfg):
+def _ld_targets(cfg: SlalomConfig) -> Tuple[List[str], List[str], List[str], List[str]]:
     """Return (bm_paths, variant_index_paths, r_labels, r2_labels) for the LD reference.
 
     ``r_labels`` are the canonical signed-r columns consumed internally (``_combine_ld`` and
@@ -120,13 +125,15 @@ def _ld_targets(cfg):
         r_labels = [f"gnomad_lead_r_{pop}" for pop in resources.LD_POPS]
         r2_labels = [f"gnomad_lead_r2_{pop}" for pop in resources.LD_POPS]
         return bm_paths, index_paths, r_labels, r2_labels
-    # custom single-panel reference
+    # custom single-panel reference (paths are validated non-None for --ld-reference custom)
     r_labels = [f"{cfg.custom_ld_label}_lead_r"]
     r2_labels = [f"{cfg.custom_ld_label}_lead_r2"]
-    return [cfg.custom_ld_path], [cfg.custom_ld_variant_index_path], r_labels, r2_labels
+    bm_paths = cast(List[str], [cfg.custom_ld_path])
+    index_paths = cast(List[str], [cfg.custom_ld_variant_index_path])
+    return bm_paths, index_paths, r_labels, r2_labels
 
 
-def run_slalom(cfg: SlalomConfig):
+def run_slalom(cfg: SlalomConfig) -> "pd.DataFrame":
     """Run the full SLALOM pipeline for one locus and write the output table(s).
 
     Returns the annotated per-variant DataFrame.
@@ -214,13 +221,14 @@ def run_slalom(cfg: SlalomConfig):
 
     if cfg.summary:
         summary_df = _build_summary(df, cfg)
-        write_table(summary_df, cfg.out_summary, storage_options=cfg.storage_options)
+        # out_summary is always populated in __post_init__ (defaulted from `out`).
+        write_table(summary_df, cast(str, cfg.out_summary), storage_options=cfg.storage_options)
         logger.info("Wrote %s", cfg.out_summary)
 
     return df
 
 
-def _combine_ld(df, cfg, labels):
+def _combine_ld(df: "pd.DataFrame", cfg: SlalomConfig, labels: List[str]) -> None:
     """Populate df['r'] from the per-population LD columns (or the custom panel)."""
     if cfg.weighted_average_r is not None:
         n_samples = []
@@ -242,16 +250,16 @@ def _combine_ld(df, cfg, labels):
         if len(n_samples) == 1:
             df["r"] = ld[0]
         else:
-            n_samples = np.array(n_samples, dtype=np.float64).T
-            ld = np.array(ld, dtype=np.float64).T
-            df["r"] = np.nansum(n_samples * ld, axis=1) / np.nansum(n_samples * ~np.isnan(ld), axis=1)
+            weights = np.array(n_samples, dtype=np.float64).T
+            ld_arr = np.array(ld, dtype=np.float64).T
+            df["r"] = np.nansum(weights * ld_arr, axis=1) / np.nansum(weights * ~np.isnan(ld_arr), axis=1)
     elif cfg.ld_reference == "custom":
         df["r"] = df[labels[0]]
     else:
         df["r"] = df["gnomad_lead_r_nfe"]
 
 
-def _build_summary(df, cfg):
+def _build_summary(df: "pd.DataFrame", cfg: SlalomConfig) -> "pd.DataFrame":
     """Build the per-locus summary table."""
     import pandas as pd
 

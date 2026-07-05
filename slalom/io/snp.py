@@ -1,5 +1,9 @@
 """Read the per-locus SNP input and write SLALOM output tables (local or gs://)."""
 
+from __future__ import annotations
+
+from typing import Optional
+
 import fsspec
 import pandas as pd
 
@@ -8,7 +12,7 @@ import pandas as pd
 REQUIRED_COLUMNS = ["chromosome", "position", "allele1", "allele2", "beta", "se"]
 
 
-def read_snp(path, storage_options=None):
+def read_snp(path: str, storage_options: Optional[dict] = None) -> pd.DataFrame:
     """Read a whitespace-delimited SNP file into a DataFrame.
 
     `chromosome` is read as a string so contig names like "chr1"/"X" survive round-trip.
@@ -25,7 +29,7 @@ def read_snp(path, storage_options=None):
     return df
 
 
-def write_table(df, path, storage_options=None):
+def write_table(df: pd.DataFrame, path: str, storage_options: Optional[dict] = None) -> None:
     """Write a DataFrame as a tab-separated table with NA-encoded missing values."""
     with fsspec.open(path, "wt", **(storage_options or {})) as fh:
         df.to_csv(fh, sep="\t", na_rep="NA", index=False)

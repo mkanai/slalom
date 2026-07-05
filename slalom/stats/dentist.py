@@ -6,11 +6,18 @@ scored as a 1-df chi-square, flags an association-statistic outlier that is inco
 with the local LD structure (see Kanai et al. 2022; Chen et al. 2021 for DENTIST).
 """
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Tuple
+
 import numpy as np
 import scipy.stats
 
+if TYPE_CHECKING:
+    import numpy.typing as npt
 
-def dentist_s(z, r, lead_idx):
+
+def dentist_s(z: "npt.ArrayLike", r: "npt.ArrayLike", lead_idx: int) -> Tuple[np.ndarray, np.ndarray]:
     """Compute the DENTIST-S statistic and its -log10 p-value for every variant.
 
     Parameters

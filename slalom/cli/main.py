@@ -1,10 +1,13 @@
 """``slalom`` command-line entry point."""
 
+from __future__ import annotations
+
 import argparse
 import json
 import logging
 import os
 import sys
+from typing import Any, Optional, Sequence, Union, cast
 
 from .. import __version__, resources
 from ..pipeline import SlalomConfig, run_slalom
@@ -16,17 +19,22 @@ logger = logging.getLogger("slalom")
 class ParseKwargs(argparse.Action):
     """Parse ``key=value`` pairs into a dict, coercing numeric values to float."""
 
-    def __call__(self, parser, namespace, values, option_string=None):
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: Union[str, Sequence[Any], None],
+        option_string: Optional[str] = None,
+    ) -> None:
         result = {}
-        for value in values:
-            key, val = value.split("=")
-            if val.replace(".", "", 1).isnumeric():
-                val = float(val)
-            result[key] = val
+        # nargs="+" always yields a list of POP=WEIGHT strings here.
+        for value in cast(Sequence[str], values):
+            key, raw = value.split("=")
+            result[key] = float(raw) if raw.replace(".", "", 1).isnumeric() else raw
         setattr(namespace, self.dest, result)
 
 
-def build_parser():
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="slalom",
         description="SLALOM: flag suspicious loci for meta-analysis fine-mapping using "
@@ -118,7 +126,7 @@ def build_parser():
     return parser
 
 
-def _parse_storage_options(raw):
+def _parse_storage_options(raw: Optional[str]) -> Optional[dict]:
     if not raw:
         return None
     try:
@@ -130,7 +138,7 @@ def _parse_storage_options(raw):
     return opts
 
 
-def _validate(args):
+def _validate(args: argparse.Namespace) -> None:
     if args.ld_reference == "custom" and (
         not args.custom_ld_path or not args.custom_ld_variant_index_path or not args.custom_ld_label
     ):
@@ -145,7 +153,7 @@ def _validate(args):
         raise ValueError("--summary requires --abf (it reports max PIP / credible sets).")
 
 
-def _config_from_args(args):
+def _config_from_args(args: argparse.Namespace) -> SlalomConfig:
     ld_variant_index_paths = None
     if args.ld_variant_index_dir:
         ld_variant_index_paths = resources.ld_variant_index_paths(args.reference_genome, base=args.ld_variant_index_dir)
@@ -182,7 +190,7 @@ def _config_from_args(args):
     )
 
 
-def main(argv=None):
+def main(argv: Optional[Sequence[str]] = None) -> None:
     parser = build_parser()
     args = parser.parse_args(argv)
 
