@@ -6,8 +6,8 @@ All notable changes to this project are documented in this file. The format is b
 ## [2.0.0] - 2026-07-04
 
 First packaged, Hail-free release on PyPI (major bump from the standalone `slalom.py` script,
-which was distributed as 1.0.0). SLALOM is now a pip-installable package with a `slalom`
-console entry point.
+which was distributed as 1.0.0). SLALOM is now a pip-installable package (`pip install
+slalom-qc`; imported as `slalom`) with a `slalom` console entry point.
 
 ### Added
 - Modern package layout (`slalom.{stats,io,annotate,ld,cli,pipeline}`) with a `slalom` CLI.

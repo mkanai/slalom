@@ -18,12 +18,15 @@ list of changes from the original single-file `slalom.py`.
 ## Installation
 
 ```bash
-pip install slalom
+pip install slalom-qc
 ```
+
+The distribution is published on PyPI as `slalom-qc`; the import package and CLI are both
+`slalom` (`import slalom`, `slalom --help`).
 
 Python ≥ 3.9. Reading LD or reference tables from Google Cloud Storage uses `gcsfs`
 (installed automatically); reading a `BlockMatrix` from AWS S3 (e.g. Pan-UKB) needs the
-`s3` extra: `pip install "slalom[s3]"`.
+`s3` extra: `pip install "slalom-qc[s3]"`.
 
 ## Usage
 
@@ -113,7 +116,7 @@ download).
 The Parquet variant indices are provided by ldcov (see its README for pre-computed bundles
 and the `gnomAD`/`Pan-UKB` populations available). The gnomAD sites and CUP Parquet tables
 are built **once** from the original Hail Tables with the helpers under `scripts/` (Hail is
-only needed for this one-time step; install it with `pip install "slalom[convert]"`):
+only needed for this one-time step; install it with `pip install "slalom-qc[convert]"`):
 
 ```bash
 # gnomAD sites: written via Spark as a *partitioned Parquet directory* (the genome-wide HT

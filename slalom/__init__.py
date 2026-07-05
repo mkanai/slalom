@@ -15,7 +15,8 @@ from importlib.metadata import version as _version
 from typing import Any
 
 try:
-    __version__ = _version("slalom")
+    # Distribution name on PyPI is "slalom-qc"; the import package stays "slalom".
+    __version__ = _version("slalom-qc")
 except _PackageNotFoundError:  # running from a source tree without an install
     __version__ = "0.0.0+unknown"
 
