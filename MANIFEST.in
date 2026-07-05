@@ -1,0 +1,16 @@
+include LICENSE
+include README.md
+include CHANGELOG.md
+include pyproject.toml
+include MANIFEST.in
+
+# One-time Hail reference-table converters (sdist only; not needed at runtime).
+recursive-include scripts *.py
+
+# Tests in the sdist so downstream packagers can verify a build.
+recursive-include tests *.py
+
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude __pycache__
+global-exclude .git*

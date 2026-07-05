@@ -5,3 +5,22 @@
 __pycache__/
 *.py[cod]
 *$py.class
+
+# Packaging / build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Test / tooling caches
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+
+# Stray Hail driver logs
+hail-*.log
