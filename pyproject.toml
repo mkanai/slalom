@@ -1,0 +1,88 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "slalom"
+version = "2.0.0"
+description = "Suspicious loci analysis of meta-analysis summary statistics (SLALOM)"
+readme = "README.md"
+authors = [
+    {name = "Masahiro Kanai", email = "mkanai@broadinstitute.org"}
+]
+license = {text = "MIT License"}
+# >=3.9 to match ldcov (which provides the Hail BlockMatrix reader) and lazybgen.
+requires-python = ">=3.9"
+keywords = ["gwas", "fine-mapping", "meta-analysis", "linkage-disequilibrium", "qc", "bioinformatics"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+dependencies = [
+    # ldcov provides the pure-Python Hail BlockMatrix reader + Parquet variant index
+    # (no Hail/Spark at runtime). >=0.5.0 for VariantIndex.match_variants() and
+    # exact-orientation-by-default matching.
+    "ldcov>=0.5.0",
+    "numpy>=1.19.0",
+    "scipy>=1.5.0",
+    "pandas>=1.0.0",
+    "pyarrow>=6.0.0",
+    "fsspec>=2021.0.0",
+    "gcsfs>=0.7.0",
+]
+
+[project.optional-dependencies]
+s3 = ["s3fs>=2021.0.0"]  # read BlockMatrix LD (e.g. Pan-UKB) from AWS S3 via fsspec
+# The one-time reference-table converters under scripts/ need Hail; the runtime never does.
+convert = ["hail>=0.2"]
+dev = [
+    "pytest>=6.0.0",
+    "pytest-cov>=2.10.0",
+    "black>=25.11.0",  # last black supporting py3.9; tree is formatted for both 25.x and newer
+    "ruff>=0.6.0",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/mkanai/slalom"
+"Bug Tracker" = "https://github.com/mkanai/slalom/issues"
+"Changelog" = "https://github.com/mkanai/slalom/blob/master/CHANGELOG.md"
+
+[project.scripts]
+slalom = "slalom.cli.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["slalom*"]
+
+[tool.black]
+line-length = 120
+target-version = ['py39', 'py310', 'py311']
+
+[tool.isort]
+profile = "black"
+line_length = 120
+
+[tool.ruff]
+line-length = 120
+target-version = "py39"
+
+[tool.ruff.lint]
+# pycodestyle errors, pyflakes, warnings, import sorting. Formatting stays with black.
+select = ["E", "F", "W", "I"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+python_files = "test_*.py"
+python_functions = "test_*"
+markers = [
+    "integration: marks tests that require external resources (e.g. gnomAD LD on GCS)"
+]
